@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 
-	"42stellar.org/webhooks/internal/valuable"
+	"atomys.codes/webhooked/internal/valuable"
 )
 
 type storage struct {
@@ -16,14 +16,19 @@ type storage struct {
 }
 
 type config struct {
-	Host     string
-	Port     string
-	Database int
-	Username valuable.Valuable
-	Password valuable.Valuable
-	Key      string
+	Host     string            `mapstructure:"host" json:"host"`
+	Port     string            `mapstructure:"port" json:"port"`
+	Database int               `mapstructure:"database" json:"database"`
+	Username valuable.Valuable `mapstructure:"username" json:"username"`
+	Password valuable.Valuable `mapstructure:"password" json:"password"`
+	Key      string            `mapstructure:"key" json:"key"`
 }
 
+// NewStorage is the function for create new Redis storage client
+// Run is made from external caller at begins programs
+// @param config contains config define in the webhooks yaml file
+// @return RedisStorage the struct contains client connected and config
+// @return an error if the the client is not initialized successfully
 func NewStorage(configRaw map[string]interface{}) (*storage, error) {
 
 	newClient := storage{

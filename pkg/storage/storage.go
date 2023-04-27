@@ -3,11 +3,14 @@ package storage
 import (
 	"fmt"
 
-	"42stellar.org/webhooks/pkg/storage/postgres"
-	"42stellar.org/webhooks/pkg/storage/rabbitmq"
-	"42stellar.org/webhooks/pkg/storage/redis"
+	"atomys.codes/webhooked/pkg/storage/postgres"
+	"atomys.codes/webhooked/pkg/storage/rabbitmq"
+	"atomys.codes/webhooked/pkg/storage/redis"
 )
 
+// Pusher is the interface for storage pusher
+// The name must be unique and must be the same as the storage type, the Push
+// function will be called with the receiving data
 type Pusher interface {
 	// Get the name of the storage
 	// Will be unique across all storages

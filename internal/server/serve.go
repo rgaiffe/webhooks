@@ -5,14 +5,22 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 
-	v1alpha1 "42stellar.org/webhooks/internal/server/v1alpha1"
+	"atomys.codes/webhooked/internal/config"
+	v1alpha1 "atomys.codes/webhooked/internal/server/v1alpha1"
 )
 
+// APIVersion is the interface for all supported API versions
+// that can be served by the webhooked server
 type APIVersion interface {
 	Version() string
 	WebhookHandler() http.HandlerFunc
+}
+
+type Server struct {
+	*http.Server
 }
 
 var (
@@ -22,20 +30,41 @@ var (
 	}
 )
 
-// Serve the proxy server on the given port for all supported API versions
-func Serve(port int) error {
+// NewServer create a new server instance with the given port
+func NewServer(port int) (*Server, error) {
 	if !validPort(port) {
-		return fmt.Errorf("invalid port")
+		return nil, fmt.Errorf("invalid port")
 	}
 
-	log.Info().Msgf("Listening on port %d", port)
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), newRouter())
+	return &Server{
+		Server: &http.Server{
+			Addr:    fmt.Sprintf(":%d", port),
+			Handler: nil,
+		},
+	}, nil
 }
 
+// Serve the proxy server on the given port for all supported API versions
+func (s *Server) Serve() error {
+	router := newRouter()
+	router.Use(loggingMiddleware)
+
+	if config.Current().Observability.MetricsEnabled {
+		router.Use(prometheusMiddleware)
+		router.Handle("/metrics", promhttp.Handler()).Name("metrics")
+	}
+
+	s.Handler = router
+	log.Info().Msgf("Listening on %s", s.Addr)
+	return s.ListenAndServe()
+}
+
+// newRouter returns a new router with all the routes
+// for all supported API versions
 func newRouter() *mux.Router {
 	var api = mux.NewRouter()
 	for _, version := range apiVersions {
-		api.Methods("POST").PathPrefix("/" + version.Version()).Handler(version.WebhookHandler())
+		api.Methods("POST").PathPrefix("/" + version.Version()).Handler(version.WebhookHandler()).Name(version.Version())
 	}
 
 	api.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

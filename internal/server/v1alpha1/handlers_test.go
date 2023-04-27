@@ -10,9 +10,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 
-	"42stellar.org/webhooks/internal/config"
-	"42stellar.org/webhooks/internal/valuable"
-	"42stellar.org/webhooks/pkg/factory"
+	"atomys.codes/webhooked/internal/config"
+	"atomys.codes/webhooked/internal/valuable"
+	"atomys.codes/webhooked/pkg/factory"
+	"atomys.codes/webhooked/pkg/storage"
 )
 
 func TestNewServer(t *testing.T) {
@@ -30,18 +31,18 @@ func TestServer_Version(t *testing.T) {
 func TestServer_WebhookHandler(t *testing.T) {
 	assert.Equal(t,
 		http.StatusBadRequest,
-		testServer_WebhookHandler_Helper(t, &Server{config: &config.Configuration{APIVersion: "invalidVersion"}}).Code,
+		testServerWebhookHandlerHelper(t, &Server{config: &config.Configuration{APIVersion: "invalidVersion"}}).Code,
 	)
 
 	assert.Equal(t,
 		http.StatusNotFound,
-		testServer_WebhookHandler_Helper(t, &Server{config: &config.Configuration{APIVersion: "v1alpha1"}}).Code,
+		testServerWebhookHandlerHelper(t, &Server{config: &config.Configuration{APIVersion: "v1alpha1"}}).Code,
 	)
 
 	var expectedError = errors.New("err during processing webhook")
 	assert.Equal(t,
 		http.StatusInternalServerError,
-		testServer_WebhookHandler_Helper(t, &Server{
+		testServerWebhookHandlerHelper(t, &Server{
 			config: &config.Configuration{
 				APIVersion: "v1alpha1",
 				Specs: []*config.WebhookSpec{
@@ -56,7 +57,7 @@ func TestServer_WebhookHandler(t *testing.T) {
 
 	assert.Equal(t,
 		http.StatusOK,
-		testServer_WebhookHandler_Helper(t, &Server{
+		testServerWebhookHandlerHelper(t, &Server{
 			config: &config.Configuration{
 				APIVersion: "v1alpha1",
 				Specs: []*config.WebhookSpec{
@@ -71,7 +72,7 @@ func TestServer_WebhookHandler(t *testing.T) {
 
 	assert.Equal(t,
 		http.StatusForbidden,
-		testServer_WebhookHandler_Helper(t, &Server{
+		testServerWebhookHandlerHelper(t, &Server{
 			config: &config.Configuration{
 				APIVersion: "v1alpha1",
 				Specs: []*config.WebhookSpec{
@@ -86,7 +87,7 @@ func TestServer_WebhookHandler(t *testing.T) {
 
 	assert.Equal(t,
 		http.StatusBadRequest,
-		testServer_WebhookHandler_Helper(t, &Server{
+		testServerWebhookHandlerHelper(t, &Server{
 			config: &config.Configuration{
 				APIVersion: "v0test",
 				Specs: []*config.WebhookSpec{
@@ -100,7 +101,7 @@ func TestServer_WebhookHandler(t *testing.T) {
 	)
 }
 
-func testServer_WebhookHandler_Helper(t *testing.T, server *Server) *httptest.ResponseRecorder {
+func testServerWebhookHandlerHelper(t *testing.T, server *Server) *httptest.ResponseRecorder {
 	server.logger = log.With().Str("apiVersion", server.Version()).Logger()
 
 	// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
@@ -125,41 +126,120 @@ func Test_webhookService(t *testing.T) {
 
 	headerFactory, _ := factory.GetFactoryByName("header")
 	compareFactory, _ := factory.GetFactoryByName("compare")
-	validPipeline := factory.NewPipeline().AddFactory(headerFactory).AddFactory(compareFactory)
 
 	req := httptest.NewRequest("POST", "/v1alpha1/test", strings.NewReader("{}"))
 	req.Header.Set("X-Token", "test")
+
+	invalidReq := httptest.NewRequest("POST", "/v1alpha1/test", nil)
+	invalidReq.Body = nil
+
+	validPipeline := factory.NewPipeline().AddFactory(headerFactory).AddFactory(compareFactory)
 	validPipeline.Inputs["request"] = req
 	validPipeline.Inputs["headerName"] = &factory.InputConfig{Name: "headerName", Valuable: valuable.Valuable{Values: []string{"X-Token"}}}
 	validPipeline.Inputs["first"] = &factory.InputConfig{Name: "headerName", Valuable: valuable.Valuable{Values: []string{"{{ .Outputs.header.value }}"}}}
 	validPipeline.Inputs["second"] = &factory.InputConfig{Name: "headerName", Valuable: valuable.Valuable{Values: []string{"test"}}}
 
-	var tests = []struct {
-		name    string
-		input   *config.WebhookSpec
-		wantErr bool
-	}{
-		{"no spec", nil, true},
-		{"no security", &config.WebhookSpec{
-			Security: nil,
-		}, false},
-		{"empty security", &config.WebhookSpec{
-			SecurityPipeline: factory.NewPipeline(),
-		}, false},
+	invalidPipeline := factory.NewPipeline().AddFactory(headerFactory).AddFactory(compareFactory)
+	invalidPipeline.Inputs["request"] = req
+	invalidPipeline.Inputs["headerName"] = &factory.InputConfig{Name: "headerName", Valuable: valuable.Valuable{Values: []string{"X-Token"}}}
+	invalidPipeline.Inputs["first"] = &factory.InputConfig{Name: "headerName", Valuable: valuable.Valuable{Values: []string{"{{ .Outputs.header.value }}"}}}
+	invalidPipeline.Inputs["second"] = &factory.InputConfig{Name: "headerName", Valuable: valuable.Valuable{Values: []string{"INVALID"}}}
 
-		{"valid security", &config.WebhookSpec{
+	type input struct {
+		spec *config.WebhookSpec
+		req  *http.Request
+	}
+
+	var tests = []struct {
+		name     string
+		input    *input
+		wantErr  bool
+		matchErr error
+	}{
+		{"no spec", &input{nil, req}, true, config.ErrSpecNotFound},
+		{"no security", &input{&config.WebhookSpec{Security: nil}, req}, false, nil},
+		{"empty security", &input{&config.WebhookSpec{
+			SecurityPipeline: factory.NewPipeline(),
+		}, req}, false, nil},
+
+		{"valid security", &input{&config.WebhookSpec{
 			SecurityPipeline: validPipeline,
-		}, false},
+		}, req}, false, nil},
+		{"invalid security", &input{&config.WebhookSpec{
+			SecurityPipeline: invalidPipeline,
+		}, req}, true, errSecurityFailed},
+		{"invalid body payload", &input{&config.WebhookSpec{
+			SecurityPipeline: validPipeline,
+		}, invalidReq}, true, errRequestBodyMissing},
 	}
 
 	for _, test := range tests {
-		got := webhookService(&Server{}, test.input, req)
+		log.Warn().Msgf("body %+v", test.input.req.Body)
+		got := webhookService(&Server{}, test.input.spec, test.input.req)
 		if test.wantErr {
-			assert.Error(got, "input: %s", test.name)
+			assert.ErrorIs(got, test.matchErr, "input: %s", test.name)
 		} else {
 			assert.NoError(got, "input: %s", test.name)
 		}
 	}
+}
+
+func TestServer_webhokServiceStorage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("TestServer_webhokServiceStorage testing is skiped in short version of test")
+		return
+	}
+
+	pusher, err := storage.Load("redis", map[string]interface{}{
+		"host":     "127.0.0.1",
+		"port":     "6379",
+		"database": 0,
+		"key":      "testKey",
+	})
+	assert.NoError(t, err)
+
+	var tests = []struct {
+		name           string
+		req            *http.Request
+		templateString string
+		wantErr        bool
+	}{
+		{
+			"basic",
+			httptest.NewRequest("POST", "/v1alpha1/test", strings.NewReader("{}")),
+			"{{ .Payload }}",
+			false,
+		},
+		{
+			"invalid template",
+			httptest.NewRequest("POST", "/v1alpha1/test", strings.NewReader("{}")),
+			"{{ ",
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		spec := &config.WebhookSpec{
+			Security: nil,
+			Storage: []*config.StorageSpec{
+				{
+					Type: "redis",
+					Formatting: &config.FormattingSpec{
+						Template: test.templateString,
+					},
+					Client: pusher,
+				},
+			},
+		}
+
+		got := webhookService(&Server{}, spec, test.req)
+		if test.wantErr {
+			assert.Error(t, got, "input: %s", test.name)
+		} else {
+			assert.NoError(t, got, "input: %s", test.name)
+		}
+	}
+
 }
 
 func TestServer_runSecurity(t *testing.T) {

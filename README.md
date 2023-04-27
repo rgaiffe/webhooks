@@ -1,15 +1,19 @@
-# Webhooked
+<h1 align="center">Webhooked</h1>
 
-[![Release 🎉](https://github.com/42Atomys/webhooked/actions/workflows/release.yaml/badge.svg)](https://github.com/42Atomys/webhooked/actions/workflows/release.yaml)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/42atomys/webhooked?label=last%20release)
-![GitHub contributors](https://img.shields.io/github/contributors/42Atomys/webhooked?color=blueviolet)
-![GitHub Repo stars](https://img.shields.io/github/stars/42atomys/webhooked?color=blueviolet)
-[![Docker Pull](https://img.shields.io/docker/pulls/atomys/webhooked)](https://hub.docker.com/r/atomys/webhooked)
-[![Docker Pull](https://img.shields.io/docker/image-size/atomys/webhooked)](https://hub.docker.com/r/atomys/webhooked)
+<p align="center"><a href="https://github.com/42Atomys/webhooked/actions/workflows/release.yaml"><img src="https://github.com/42Atomys/webhooked/actions/workflows/release.yaml/badge.svg" alt="Release 🎉"></a>
+<a href="https://goreportcard.com/report/atomys.codes/webhooked"><img src="https://goreportcard.com/badge/atomys.codes/webhooked" /></a>
+<a href="https://codeclimate.com/github/42Atomys/webhooked"><img alt="Code Climate maintainability" src="https://img.shields.io/codeclimate/maintainability/42Atomys/webhooked"></a>
+<a href="https://codecov.io/gh/42Atomys/webhooked"><img alt="Codecov" src="https://img.shields.io/codecov/c/gh/42Atomys/webhooked?token=NSUZMDT9M9"></a>
+<img src="https://img.shields.io/github/v/release/42atomys/webhooked?label=last%20release" alt="GitHub release (latest by date)">
+<img src="https://img.shields.io/github/contributors/42Atomys/webhooked?color=blueviolet" alt="GitHub contributors">
+<img src="https://img.shields.io/github/stars/42atomys/webhooked?color=blueviolet" alt="GitHub Repo stars">
+<a href="https://hub.docker.com/r/atomys/webhooked"><img src="https://img.shields.io/docker/pulls/atomys/webhooked" alt="Docker Pull"></a>
+<a href="https://hub.docker.com/r/atomys/webhooked"><img src="https://img.shields.io/docker/image-size/atomys/webhooked" alt="Docker Pull"></a>
+<a href="https://pkg.go.dev/atomys.codes/webhooked"><img src="https://pkg.go.dev/badge/atomys.codes/webhooked.svg" alt="Go Reference"></a></p>
+  
+<p align="center">A webhook receiver on steroids. The process is simple, receive webhook from all over the world, and send it to your favorite pub/sub to process it immediately or later without losing any received data</p>
 
-A webhook receiver on steroids. The process is simple, receive webhook from all over the world, and send it to your favorite pub/sub to process it immediately or later without losing any received data 
-
-![Webhooked explained](/.github/profile/webhooked.png)
+<p align="center"><img src="/.github/profile/webhooked.png" alt="Webhooked explained"></p>
 
 ## Motivation
 
@@ -19,7 +23,7 @@ This is exactly what `Webhooked` does !
 
 ## Roadmap
 
-I am actively working on this project to release a stable version by the **end of March 2022**
+I am actively working on this project in order to release a stable version for **2023**
 
 ![Roadmap](/.github/profile/roadmap.png)
 
@@ -58,6 +62,28 @@ specs:
         values: ['foo', 'bar']
         valueFrom:
           envRef: SECRET_TOKEN
+  
+  # Formatting allows you to apply a custom format to the payload received
+  # before send it to the storage. You can use built-in helper function to
+  # format it as you want. (Optional)
+  #
+  # Per default the format applied is: "{{ .Payload }}"
+  # 
+  # THIS IS AN ADVANCED FEATURE :
+  # Be careful when using this feature, the slightest error in format can
+  # result in DEFFINITIVE loss of the collected data. Make sure your template is
+  # correct before applying it in production.
+  formatting:
+    templateString: |
+      {
+        "config": "{{ toJson .Config }}",
+        "metadata": {
+          "specName": "{{ .Spec.Name }}",
+          "deliveryID": "{{ .Request.Header | getHeader "X-Delivery" | default "unknown" }}"
+        },
+        "payload": {{ .Payload }}
+      }
+
   # Storage allows you to list where you want to store the raw payloads
   # received by webhooked. You can add an unlimited number of storages, webhooked
   # will store in **ALL** the listed storages
@@ -66,6 +92,9 @@ specs:
   # on the `example-webhook` Redis Key on the Database 0
   storage:
   - type: redis
+    # You can apply a specific formatting per storage (Optional)
+    formatting: {}
+    # Storage specification
     specs:
       host: redis.default.svc.cluster.local
       port: 6379
@@ -75,7 +104,9 @@ specs:
 
 More informations about security pipeline available on wiki : [Configuration/Security](https://github.com/42Atomys/webhooked/wiki/Security)
 
-More informations about storages available on wiki : [Configuration/Storages](https://github.com/42Atomys/webhooked/wiki/Configuration-Storages)
+More informations about storages available on wiki : [Configuration/Storages](https://github.com/42Atomys/webhooked/wiki/Storages)
+
+More informations about formatting available on wiki : [Configuration/Formatting](https://github.com/42Atomys/webhooked/wiki/Formatting)
 
 ### Step 2 : Launch it 🚀
 ### With Kubernetes

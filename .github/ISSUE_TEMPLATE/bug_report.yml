@@ -1,0 +1,107 @@
+name: Bug report
+description: File a bug report
+title: 'fix: '
+labels: ['type/bug 🔥']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        _You have found a bug, bravo! Or rather, sorry! Send us the information about this bug so we can fix it as soon as possible._
+
+        _If you feel like contributing and fixing this bug yourself, you can totally do it by adding a comment after your issue so we can assign you to it! Open a Pull Request and send it!_
+
+        🙏 _Thanks in advance for your contribution_
+  # Describe
+  - type: textarea
+    id: describe
+    attributes:
+      label: Describe the bug
+      description: Thanks for taking the time to describe the bug with more details as you can
+      placeholder: "A bug happened when I receive data"
+    validations:
+      required: true
+  # Reproduce
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: To Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. My config is '...'
+        2. Try to store following payload '....'
+        3. See error
+    validations:
+      required: true
+  # What happened ?
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Also tell us, what did you expect to happen?
+      placeholder: A bug happened, send help!
+    validations:
+      required: true
+  # Expected
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen, if applicable
+      placeholder: Maybe can response with..
+    validations:
+      required: false
+  # Logs
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: Shell
+  # Version
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version of software
+      description: What version of our software are you running?
+      options:
+        - '1.0'
+        - '0.5'
+    validations:
+      required: true
+  # Environment
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: What is the environment used to run our software?
+      options:
+        - 'Docker'
+        - 'Binary on Windows'
+        - 'Binary on Darwin (osx)'
+        - 'Binary on Linux (Ubuntu/Debin/Arch/...)'
+    validations:
+      required: true
+  # Environment details
+  - type: input
+    id: environment-details
+    attributes:
+      label: Environment version
+      description: If you use the binary version of software, please provide the version of your OS
+      placeholder: OSX 10.11 (El Capitan)
+    validations:
+      required: false
+  # additional context
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here
+  # Code if Conduct
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/42Atomys/webhooked/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

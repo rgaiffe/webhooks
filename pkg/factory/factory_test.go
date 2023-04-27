@@ -9,14 +9,16 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"42stellar.org/webhooks/internal/valuable"
+	"atomys.codes/webhooked/internal/valuable"
 )
 
 type fakeFactory struct{}
 
-func (*fakeFactory) Name() string           { return "fake" }
-func (*fakeFactory) DefinedInpus() []*Var   { return []*Var{{false, reflect.TypeOf(""), "name", ""}} }
-func (*fakeFactory) DefinedOutputs() []*Var { return []*Var{{false, reflect.TypeOf(""), "message", ""}} }
+func (*fakeFactory) Name() string         { return "fake" }
+func (*fakeFactory) DefinedInpus() []*Var { return []*Var{{false, reflect.TypeOf(""), "name", ""}} }
+func (*fakeFactory) DefinedOutputs() []*Var {
+	return []*Var{{false, reflect.TypeOf(""), "message", ""}}
+}
 func (*fakeFactory) Func() RunFunc {
 	return func(factory *Factory, configRaw map[string]interface{}) error {
 		n, ok := factory.Input("name")
@@ -158,4 +160,11 @@ func (suite *testSuiteFactory) TestProcessInputConfig() {
 func (suite *testSuiteFactory) TestGoTempalteValue() {
 	ret := goTemplateValue("{{ .test }}", map[string]interface{}{"test": "testValue"})
 	suite.Equal("testValue", ret)
+}
+
+func (suite *testSuiteFactory) TestFactoryDeepCopy() {
+	var factory = newFactory(&fakeFactory{})
+	factory.WithConfig(map[string]interface{}{"name": "test"})
+
+	suite.NotSame(factory, factory.DeepCopy())
 }

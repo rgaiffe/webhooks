@@ -1,4 +1,6 @@
 /*
+Package cmd : cobra package
+
 Copyright © 2022 42Stellar
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,8 +27,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"42stellar.org/webhooks/internal/config"
-	"42stellar.org/webhooks/internal/server"
+	"atomys.codes/webhooked/internal/config"
+	"atomys.codes/webhooked/internal/server"
 )
 
 var (
@@ -40,7 +42,12 @@ var (
 				log.Fatal().Err(err).Msg("invalid configuration")
 			}
 
-			log.Fatal().Err(server.Serve(*flagPort)).Msg("Error during server start")
+			srv, err := server.NewServer(*flagPort)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to create server")
+			}
+
+			log.Fatal().Err(srv.Serve()).Msg("Error during server start")
 		},
 	}
 )

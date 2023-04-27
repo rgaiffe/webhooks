@@ -1,4 +1,6 @@
 apiVersion: v1alpha1
+observability:
+  metricsEnabled: true
 specs:
 - name: exampleHook
   entrypointUrl: /webhooks/example
@@ -10,7 +12,7 @@ specs:
   - compare:
       inputs:
       - name: first
-        value: '{{ Outputs.header.value }}'
+        value: '{{ .Outputs.header.value }}'
       - name: second
         valueFrom:
           envRef: SECRET_TOKEN
@@ -18,7 +20,7 @@ specs:
   - type: redis
     specs:
       host: redis
-      port: 6379
+      port: '6379'
       database: 0
       password:
         valueFrom:

@@ -7,6 +7,7 @@ on:
     paths:
     - '**/*.go'
     - '**/*.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -14,14 +15,14 @@ jobs:
     name: "GoLang test units"
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        goVersion: [ '1.16', '1.17' ]
+        goVersion: [ '1.17', '1.18' ]
     steps:
     - name: Checkout project
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Start Redis
-      uses: supercharge/redis-github-action@1.4.0
+      uses: supercharge/redis-github-action@1.5.0
       with:
         redis-version: 6
     - name: Setup RabbitMQ
@@ -39,16 +40,13 @@ jobs:
         postgresql user: webhook
         postgresql password: test
     - name: Setup go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ matrix.goVersion }}
         check-latest: true
-    - name: Use example configuration for testing
-      run: cp config/webhooks.example.yml config/webhooks.yml
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v2
+      uses: golangci/golangci-lint-action@v3.4.0
       with:
-        skip-go-installation: true
         version: latest
     - name: Run Unit tests
       run: |
@@ -56,7 +54,7 @@ jobs:
         go tool cover -func coverage.out
     - name: Quality Gate - Test coverage shall be above threshold
       env:
-          TESTCOVERAGE_THRESHOLD: 80
+          TESTCOVERAGE_THRESHOLD: 90
       run: |
         echo "Quality Gate: checking test coverage is above threshold ..."
         echo "Threshold             : $TESTCOVERAGE_THRESHOLD %"
@@ -69,6 +67,7 @@ jobs:
             echo "Failed"
             exit 1
         fi
+    - uses: codecov/codecov-action@v3
     - name: Run Go Build
       run: |
         go build -o /tmp/applications-test-units

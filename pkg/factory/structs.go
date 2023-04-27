@@ -3,8 +3,9 @@ package factory
 import (
 	"context"
 	"reflect"
+	"sync"
 
-	"42stellar.org/webhooks/internal/valuable"
+	"atomys.codes/webhooked/internal/valuable"
 )
 
 // contextKey is used to define context key inside the factory package
@@ -24,12 +25,13 @@ type InputConfig struct {
 // It is used to store the inputs and outputs of all factories executed
 // by the pipeline and secure the result of the pipeline.
 type Pipeline struct {
+	mu        sync.RWMutex
 	factories []*Factory
 
-	Result      interface{}
-	LastResults []interface{}
+	WantedResult interface{}
+	LastResults  []interface{}
 
-	Variables, Config, Inputs map[string]interface{}
+	Inputs map[string]interface{}
 
 	Outputs map[string]map[string]interface{}
 }
@@ -49,6 +51,8 @@ type Factory struct {
 	ID string
 	// Fn is the factory function
 	Fn RunFunc
+	// Protect following fields
+	mu sync.RWMutex
 	// Config is the configuration for the factory function
 	Config map[string]interface{}
 	// Inputs is the inputs of the factory
