@@ -23,7 +23,7 @@ This is exactly what `Webhooked` does !
 
 ## Roadmap
 
-I am actively working on this project in order to release a stable version for **2023**
+I am actively working on this project in order to release a stable version for **2025**
 
 ![Roadmap](/.github/profile/roadmap.png)
 
@@ -100,6 +100,23 @@ specs:
       port: 6379
       database: 0
       key: example-webhook
+
+
+  # Response is the final step of the pipeline. It allows you to send a response
+  # to the webhook sender. You can use the built-in helper function to format it
+  # as you want. (Optional)
+  #
+  # In this example we send a JSON response with a 200 HTTP code and a custom
+  # content type header `application/json`. The response contains the deliveryID
+  # header value or `unknown` if not present in the request.
+  response:
+    formatting:
+      templateString: |
+        {
+          "deliveryID": "{{ .Request.Header | getHeader "X-Delivery" | default "unknown" }}"
+        }
+    httpCode: 200
+    contentType: application/json
 ```
 
 More informations about security pipeline available on wiki : [Configuration/Security](https://github.com/42Atomys/webhooked/wiki/Security)
@@ -122,7 +139,7 @@ You can use the docker image [atomys/webhooked](https://hub.docker.com/r/atomys/
 
 ```sh
 # Basic launch instruction using the default configuration path
-docker run -it --rm -p 8080:8080 -v ${PWD}/myconfig.yaml:/config/webhooks.yaml atomys/webhooked:latest
+docker run -it --rm -p 8080:8080 -v ${PWD}/myconfig.yaml:/config/webhooked.yaml atomys/webhooked:latest
 # Use custom configuration file
 docker run -it --rm -p 8080:8080 -v ${PWD}/myconfig.yaml:/myconfig.yaml atomys/webhooked:latest serve --config /myconfig.yaml
 ```

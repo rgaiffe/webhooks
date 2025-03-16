@@ -1,6 +1,8 @@
 package redis
 
 import (
+	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,8 +28,8 @@ func (suite *RedisSetupTestSuite) TestRedisNewStorage() {
 	assert.Error(suite.T(), err)
 
 	_, err = NewStorage(map[string]interface{}{
-		"host":     "127.0.0.1",
-		"port":     "6379",
+		"host":     os.Getenv("REDIS_HOST"),
+		"port":     os.Getenv("REDIS_PORT"),
 		"database": 0,
 		"key":      "testKey",
 	})
@@ -36,17 +38,14 @@ func (suite *RedisSetupTestSuite) TestRedisNewStorage() {
 
 func (suite *RedisSetupTestSuite) TestRedisPush() {
 	newClient, err := NewStorage(map[string]interface{}{
-		"host":     "127.0.0.1",
-		"port":     "6379",
+		"host":     os.Getenv("REDIS_HOST"),
+		"port":     os.Getenv("REDIS_PORT"),
 		"database": 0,
 		"key":      "testKey",
 	})
 	assert.NoError(suite.T(), err)
 
-	err = newClient.Push(func() {})
-	assert.Error(suite.T(), err)
-
-	err = newClient.Push("Hello")
+	err = newClient.Push(context.Background(), []byte("Hello"))
 	assert.NoError(suite.T(), err)
 }
 

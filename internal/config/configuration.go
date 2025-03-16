@@ -6,9 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 
 	"atomys.codes/webhooked/pkg/factory"
 	"atomys.codes/webhooked/pkg/storage"
@@ -18,16 +23,51 @@ var (
 	currentConfig = &Configuration{}
 	// ErrSpecNotFound is returned when the spec is not found
 	ErrSpecNotFound = errors.New("spec not found")
-	// defaultTemplate is the default template for the payload
+	// defaultPayloadTemplate is the default template for the payload
 	// when no template is defined
-	defaultTemplate = `{{ .Payload }}`
+	defaultPayloadTemplate = `{{ .Payload }}`
+	// defaultResponseTemplate is the default template for the response
+	// when no template is defined
+	defaultResponseTemplate = ``
 )
 
-// Load loads the configuration from the viper configuration file
+// Load loads the configuration from the configuration file
 // if an error is occurred, it will be returned
-func Load() error {
-	err := viper.Unmarshal(&currentConfig, viper.DecodeHook(factory.DecodeHook))
+func Load(cfgFile string) error {
+	var k = koanf.New(".")
+
+	// Load YAML config.
+	if err := k.Load(file.Provider(cfgFile), yaml.Parser()); err != nil {
+		log.Error().Msgf("error loading config: %v", err)
+	}
+
+	// Load from environment variables
+	err := k.Load(env.ProviderWithValue("WH_", ".", func(s, v string) (string, interface{}) {
+		key := strings.Replace(strings.ToLower(
+			strings.TrimPrefix(s, "WH_")), "_", ".", -1)
+
+		return key, v
+	}), nil)
 	if err != nil {
+		log.Error().Msgf("error loading config: %v", err)
+	}
+
+	if os.Getenv("WH_DEBUG") == "true" {
+		k.Print()
+	}
+
+	err = k.UnmarshalWithConf("", &currentConfig, koanf.UnmarshalConf{
+		DecoderConfig: &mapstructure.DecoderConfig{
+			DecodeHook: mapstructure.ComposeDecodeHookFunc(
+				mapstructure.StringToTimeDurationHookFunc(),
+				factory.DecodeHook,
+			),
+			Result:           &currentConfig,
+			WeaklyTypedInput: true,
+		},
+	})
+	if err != nil {
+		log.Fatal().Msgf("error loading config: %v", err)
 		return err
 	}
 
@@ -36,12 +76,16 @@ func Load() error {
 			return err
 		}
 
-		if spec.Formatting, err = loadTemplate(spec.Formatting, nil); err != nil {
+		if spec.Formatting, err = loadTemplate(spec.Formatting, nil, defaultPayloadTemplate); err != nil {
 			return fmt.Errorf("configured storage for %s received an error: %s", spec.Name, err.Error())
 		}
 
 		if err = loadStorage(spec); err != nil {
 			return fmt.Errorf("configured storage for %s received an error: %s", spec.Name, err.Error())
+		}
+
+		if spec.Response.Formatting, err = loadTemplate(spec.Response.Formatting, nil, defaultResponseTemplate); err != nil {
+			return fmt.Errorf("configured response for %s received an error: %s", spec.Name, err.Error())
 		}
 	}
 
@@ -106,7 +150,7 @@ func loadStorage(spec *WebhookSpec) (err error) {
 			return fmt.Errorf("storage %s cannot be loaded properly: %s", s.Type, err.Error())
 		}
 
-		if s.Formatting, err = loadTemplate(s.Formatting, spec.Formatting); err != nil {
+		if s.Formatting, err = loadTemplate(s.Formatting, spec.Formatting, defaultPayloadTemplate); err != nil {
 			return fmt.Errorf("storage %s cannot be loaded properly: %s", s.Type, err.Error())
 		}
 	}
@@ -118,7 +162,7 @@ func loadStorage(spec *WebhookSpec) (err error) {
 // loadTemplate loads the template for the given `spec`. When no spec is defined
 // we try to load the template from the parentSpec and fallback to the default
 // template if parentSpec is not given.
-func loadTemplate(spec, parentSpec *FormattingSpec) (*FormattingSpec, error) {
+func loadTemplate(spec, parentSpec *FormattingSpec, defaultTemplate string) (*FormattingSpec, error) {
 	if spec == nil {
 		spec = &FormattingSpec{}
 	}
@@ -148,7 +192,7 @@ func loadTemplate(spec, parentSpec *FormattingSpec) (*FormattingSpec, error) {
 	if parentSpec != nil {
 		if parentSpec.Template == "" {
 			var err error
-			parentSpec, err = loadTemplate(parentSpec, nil)
+			parentSpec, err = loadTemplate(parentSpec, nil, defaultTemplate)
 			if err != nil {
 				return spec, err
 			}
